@@ -1,3 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
 # macOS
 .DS_Store
 .DS_Store?
@@ -7,51 +52,20 @@
 ehthumbs.db
 Thumbs.db
 
-# Personal files
-*.rtf
-interview*
-prep*
-*personal*
-*private*
+# Logs
+*.log
+logs/
 
-# Recycle Bin
-$RECYCLE.BIN/
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# Visual Studio
-.vs/
-*.suo
-*.sln
-*.csproj
-*.xaml
-*.cs
-*.exe
-*.dll
-*.pdb
-*.cache
-*.baml
-*.config
-*.chm
-*.pdf
-*.png
-*.ico
-*.zip
-*.json
-*.props
-*.targets
-*.nupkg
-*.p7s
-*.resx
-*.settings
-*.xml
+# Data directories (optional)
+data/landing/*.csv
+data/processed/
+data/output/
 
-# Build directories
-bin/
-obj/
-packages/
-
-# Other potentially sensitive content
-Crack/
-*/crack*
-*/Crack*
-*crack*
-*Crack* 
+# Temporary files
+*.tmp
+*.temp 
