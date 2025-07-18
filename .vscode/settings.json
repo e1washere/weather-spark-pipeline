@@ -1,0 +1,23 @@
+{
+  "git.enableSmartCommit": true,
+  "git.autofetch": true,
+  "git.autoStash": true,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "git.postCommitCommand": "sync",
+  "git.enableCommitSigning": false,
+  "extensions.autoUpdate": true,
+  "workbench.settings.enableNaturalLanguageSearch": false,
+  "git.confirmSync": false,
+  "git.autorefresh": true,
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": ".*",
+        "cmd": "bash ${workspaceFolder}/.vscode/auto-commit.sh"
+      }
+    ]
+  },
+  "runOnSave.statusMessageTimeout": 3000,
+  "runOnSave.shell": "/bin/bash"
+} 

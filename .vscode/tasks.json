@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Auto Commit",
+      "type": "shell",
+      "command": "git",
+      "args": [
+        "add",
+        ".",
+        "&&",
+        "git",
+        "commit",
+        "-m",
+        "Auto-commit: ${input:commitMessage}"
+      ],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false,
+        "clear": false
+      },
+      "runOptions": {
+        "runOn": "fileSave"
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "commitMessage",
+      "description": "Commit message",
+      "default": "Auto-commit: $(date)",
+      "type": "promptString"
+    }
+  ]
+} 
