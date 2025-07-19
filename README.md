@@ -1,4 +1,10 @@
 # Weather Spark ETL Pipeline
+![License](https://img.shields.io/github/license/e1washere/weather-spark-pipeline)
+![Last Commit](https://img.shields.io/github/last-commit/e1washere/weather-spark-pipeline)
+![Issues](https://img.shields.io/github/issues/e1washere/weather-spark-pipeline)
+![Pull Requests](https://img.shields.io/github/issues-pr/e1washere/weather-spark-pipeline)
+![Repo Stars](https://img.shields.io/github/stars/e1washere/weather-spark-pipeline?style=social)
+![Forks](https://img.shields.io/github/forks/e1washere/weather-spark-pipeline?style=social)
 
 A professional-grade ETL pipeline for processing NOAA weather data using Apache Spark and Python. This project demonstrates modern data engineering practices with comprehensive testing, monitoring, and deployment automation.
 
