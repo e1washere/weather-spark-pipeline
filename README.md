@@ -367,3 +367,28 @@ This project is licensed under the MIT License.
 **Professional ETL Pipeline Implementation**
 
 *This project demonstrates enterprise-grade ETL pipeline development with modern testing practices, comprehensive documentation, and production-ready deployment configurations.* 
+
+## Code Quality
+
+This project uses `flake8` for linting and `mypy` for static type checking. Run:
+
+```bash
+make lint
+make typecheck
+```
+
+## Data Profiling
+
+After running the ETL pipeline, generate a data profile report:
+
+```bash
+python profile_data.py data/processed/weather_parquet [profile_report.md]
+```
+
+## What I Learned
+
+- Building robust ETL pipelines with PySpark
+- Writing professional, testable, and maintainable code
+- Implementing data validation and profiling
+- Using CI/CD and automation for code quality
+- Documenting and structuring a real-world data engineering project 

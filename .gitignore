@@ -69,3 +69,6 @@ data/output/
 # Temporary files
 *.tmp
 *.temp 
+.env
+.pytest_cache/
+.mypy_cache/ 
