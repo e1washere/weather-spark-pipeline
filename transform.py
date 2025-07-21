@@ -257,6 +257,32 @@ def create_temp_view(spark: SparkSession, df: DataFrame, view_name: str = "weath
         raise
 
 
+def generate_profile_report(df: DataFrame, output_path: str = "data/profile_report.md") -> None:
+    """
+    Generate a simple data profile report (row count, nulls, min/max per column) and save as markdown.
+    Args:
+        df: Spark DataFrame to profile
+        output_path: Path to save the markdown report
+    """
+    import pandas as pd
+    logger = logging.getLogger(__name__)
+    logger.info(f"Generating data profile report at {output_path}")
+    profile = []
+    row_count = df.count()
+    profile.append(f"# Data Profile Report\n\n")
+    profile.append(f"**Row count:** {row_count}\n\n")
+    profile.append("| Column | Nulls | Min | Max |\n|---|---|---|---|\n")
+    for col_name, dtype in df.dtypes:
+        nulls = df.filter(df[col_name].isNull()).count()
+        min_val = df.agg({col_name: 'min'}).collect()[0][0]
+        max_val = df.agg({col_name: 'max'}).collect()[0][0]
+        profile.append(f"| {col_name} | {nulls} | {min_val} | {max_val} |\n")
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
+        f.writelines(profile)
+    logger.info(f"Profile report saved to {output_path}")
+
+
 def transform_weather_data(input_path: str, output_path: str) -> None:
     """
     Main transformation function that orchestrates the entire process.
@@ -286,6 +312,8 @@ def transform_weather_data(input_path: str, output_path: str) -> None:
         
         # Create SQL view
         create_temp_view(spark, df_agg)
+        # Generate profile report
+        generate_profile_report(df_agg)
         
         logger.info("Weather data transformation completed successfully")
         

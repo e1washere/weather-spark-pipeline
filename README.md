@@ -366,7 +366,7 @@ This project is licensed under the MIT License.
 
 **Professional ETL Pipeline Implementation**
 
-*This project demonstrates enterprise-grade ETL pipeline development with modern testing practices, comprehensive documentation, and production-ready deployment configurations.* 
+*This project demonstrates enterprise-grade ETL pipeline development with modern testing practices, comprehensive documentation, and production-ready deployment configurations.*
 
 ## Code Quality
 
@@ -379,11 +379,18 @@ make typecheck
 
 ## Data Profiling
 
-After running the ETL pipeline, generate a data profile report:
+After each transformation, the pipeline generates a simple data profile report (`data/profile_report.md`) with row counts, nulls, and min/max per column. This helps validate data quality and is useful for debugging and reporting.
 
-```bash
-python profile_data.py data/processed/weather_parquet [profile_report.md]
-```
+## Makefile & Linting
+
+A `Makefile` is provided for common tasks:
+- `make test` – run all tests
+- `make lint` – check code style with flake8
+- `make run` – run the full pipeline
+- `make profile` – run transformation and show the profile report
+- `make clean` – remove all generated data and logs
+
+Code style is enforced with `flake8` (see `.flake8` config).
 
 ## What I Learned
 
