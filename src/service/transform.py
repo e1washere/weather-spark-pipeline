@@ -19,7 +19,7 @@ from pyspark.sql.functions import (
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, DoubleType
 from py4j.protocol import Py4JJavaError
 
-from config import config
+from ..config import config
 
 
 def setup_logging() -> None:

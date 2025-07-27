@@ -28,16 +28,16 @@ lint:
 	flake8 . --max-line-length=100
 
 run:
-	python3 main.py --mode full
+	python3 -m src.bin.main --mode full
 
 ingest:
-	python3 main.py --mode ingest
+	python3 -m src.bin.main --mode ingest
 
 transform:
-	python3 main.py --mode transform --input-path data/landing/weather_data_*.csv
+	python3 -m src.bin.main --mode transform --input-path data/landing/weather_data_*.csv
 
 profile:
-	python3 main.py --mode transform --input-path data/landing/weather_data_*.csv
+	python3 -m src.bin.main --mode transform --input-path data/landing/weather_data_*.csv
 	@echo "Profile report generated:"
 	@cat data/profile_report.md
 

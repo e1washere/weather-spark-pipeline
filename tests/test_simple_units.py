@@ -8,7 +8,7 @@ import tempfile
 import os
 from datetime import datetime, timedelta
 
-from ingest import generate_sample_weather_data, download_noaa_data
+from src.service import generate_sample_weather_data, download_noaa_data
 
 
 @pytest.mark.unit

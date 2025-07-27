@@ -14,9 +14,8 @@ from typing import Optional
 import requests
 from py4j.protocol import Py4JJavaError
 
-from ingest import download_noaa_data
-from transform import transform_weather_data
-from config import config
+from ..service import download_noaa_data, transform_weather_data
+from ..config import config
 
 
 def setup_logging(log_level: str = "INFO") -> None:

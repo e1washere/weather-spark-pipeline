@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 
-from ingest import download_noaa_data, generate_sample_weather_data
+from src.service import download_noaa_data, generate_sample_weather_data
 
 
 @pytest.mark.unit

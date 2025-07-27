@@ -11,7 +11,7 @@ import requests
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timedelta
-from config import config
+from ..config import config
 
 
 def setup_logging() -> None:

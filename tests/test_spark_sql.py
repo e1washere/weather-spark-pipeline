@@ -6,7 +6,7 @@ Unit tests for Spark SQL functionality and weather analytics.
 import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, when, avg, sum as spark_sum, max as spark_max, min as spark_min
-from transform import create_spark_session
+from src.service import create_spark_session
 
 
 class TestWeatherAnalytics:

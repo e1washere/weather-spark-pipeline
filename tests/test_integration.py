@@ -9,8 +9,7 @@ import os
 from pathlib import Path
 from pyspark.sql import SparkSession
 from pyspark.sql.types import DateType
-from ingest import download_noaa_data
-from transform import transform_weather_data, create_spark_session
+from src.service import download_noaa_data, transform_weather_data, create_spark_session
 
 
 class TestIntegration:

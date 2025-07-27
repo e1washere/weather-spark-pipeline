@@ -57,7 +57,7 @@ run_tests() {
 # Run with different configurations
 run_full_pipeline() {
     print_info "Running full ETL pipeline with Python..."
-    python main.py \
+    python3 -m src.bin.main \
         --station-id GHCND:USW00014735 \
         --start-date 2024-01-01 \
         --end-date 2024-01-31 \
@@ -71,7 +71,7 @@ run_with_spark_submit() {
         --conf spark.sql.adaptive.enabled=true \
         --conf spark.sql.adaptive.coalescePartitions.enabled=true \
         --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
-        main.py \
+        src/bin/main.py \
         --station-id GHCND:USW00014735 \
         --start-date 2024-01-01 \
         --end-date 2024-01-31 \
@@ -80,7 +80,7 @@ run_with_spark_submit() {
 
 run_ingestion_only() {
     print_info "Running ingestion only..."
-    python main.py \
+    python3 -m src.bin.main \
         --mode ingest \
         --station-id GHCND:USW00014735 \
         --start-date 2024-01-01 \
@@ -104,7 +104,7 @@ run_transformation_only() {
         exit 1
     fi
     
-    python main.py \
+    python3 -m src.bin.main \
         --mode transform \
         --input-path "$csv_file"
 }
@@ -116,7 +116,7 @@ run_spark_cluster() {
         --executor-memory 2g \
         --total-executor-cores 4 \
         --conf spark.sql.adaptive.enabled=true \
-        main.py \
+        src/bin/main.py \
         --station-id GHCND:USW00014735 \
         --start-date 2024-01-01 \
         --end-date 2024-01-31
@@ -125,7 +125,7 @@ run_spark_cluster() {
 # Performance testing
 run_performance_test() {
     print_info "Running performance test with larger dataset..."
-    python main.py \
+    python3 -m src.bin.main \
         --station-id GHCND:USW00014735 \
         --start-date 2023-01-01 \
         --end-date 2024-12-31 \

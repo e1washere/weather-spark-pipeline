@@ -52,14 +52,14 @@ pip install -r requirements.txt
 
 ```bash
 # Complete pipeline execution
-python3 main.py --ingest --transform --station-id GHCND:USW00014735
+python3 -m src.bin.main --mode full --station-id GHCND:USW00014735
 
 # Individual components
-python3 main.py --ingest-only --start-date 2024-01-01 --end-date 2024-01-31
-python3 main.py --transform-only --input-file data/landing/weather_2024-01-01_2024-01-31.csv
+python3 -m src.bin.main --mode ingest --start-date 2024-01-01 --end-date 2024-01-31
+python3 -m src.bin.main --mode transform --input-path data/landing/weather_2024-01-01_2024-01-31.csv
 
 # Using Spark Submit (recommended for production)
-spark-submit --master local[*] main.py --ingest --transform
+spark-submit --master local[*] src/bin/main.py --mode full
 ```
 
 ### Using the Convenience Script
@@ -80,7 +80,7 @@ spark-submit --master local[*] main.py --ingest --transform
 ### 1. Basic Pipeline Execution
 
 ```python
-from main import run_full_pipeline
+from src.bin.main import run_full_pipeline
 
 # Run complete ETL pipeline
 run_full_pipeline(
@@ -95,7 +95,7 @@ run_full_pipeline(
 ### 2. Custom Data Processing
 
 ```python
-from transform import create_spark_session, transform_weather_data
+from src.service import create_spark_session, transform_weather_data
 
 # Create Spark session
 spark = create_spark_session("CustomWeatherAnalysis")
