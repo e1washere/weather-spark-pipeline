@@ -11,13 +11,14 @@ import requests
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timedelta
+from config import config
 
 
 def setup_logging() -> None:
     """Configure logging for the ingestion process."""
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=getattr(logging, config.LOG_LEVEL),
+        format=config.LOG_FORMAT
     )
 
 
@@ -25,7 +26,7 @@ def download_noaa_data(
     station_id: str = "GHCND:USW00014735",  # JFK Airport weather station
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    output_dir: str = "data/landing"
+    output_dir: Optional[str] = None
 ) -> str:
     """
     Download weather data from NOAA's Climate Data Online API.
@@ -42,14 +43,26 @@ def download_noaa_data(
     Raises:
         requests.RequestException: If download fails
         IOError: If file cannot be written
+        ValueError: If date format is invalid
     """
     logger = logging.getLogger(__name__)
+    
+    if output_dir is None:
+        output_dir = str(config.LANDING_DIR)
     
     # Default to last 30 days if no dates provided
     if not start_date:
         start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
     if not end_date:
         end_date = datetime.now().strftime('%Y-%m-%d')
+    
+    # Validate date format
+    try:
+        datetime.strptime(start_date, '%Y-%m-%d')
+        datetime.strptime(end_date, '%Y-%m-%d')
+    except ValueError as e:
+        logger.error(f"Invalid date format: {e}")
+        raise ValueError("Dates must be in YYYY-MM-DD format")
     
     # Create output directory
     output_path = Path(output_dir)
@@ -78,16 +91,31 @@ def download_noaa_data(
 
 
 def generate_sample_weather_data(start_date: str, end_date: str) -> str:
-    """Generate sample weather data in CSV format for demo purposes."""
+    """
+    Generate sample weather data in CSV format for demo purposes.
+    
+    Args:
+        start_date: Start date in YYYY-MM-DD format
+        end_date: End date in YYYY-MM-DD format
+        
+    Returns:
+        CSV string with sample weather data
+        
+    Raises:
+        ValueError: If date format is invalid
+    """
     import random
     from datetime import datetime, timedelta
+    
+    try:
+        current_date = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+    except ValueError as e:
+        raise ValueError(f"Invalid date format: {e}")
     
     csv_lines = [
         "DATE,STATION,TMAX,TMIN,PRCP,SNOW,SNWD,AWND"
     ]
-    
-    current_date = datetime.strptime(start_date, '%Y-%m-%d')
-    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
     
     while current_date <= end_dt:
         # Generate realistic weather data

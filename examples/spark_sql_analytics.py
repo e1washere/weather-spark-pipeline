@@ -14,8 +14,9 @@ from pyspark.sql.functions import col, avg, sum as spark_sum, count, max as spar
 from pyspark.sql.types import StructType, StructField, StringType, DateType, DoubleType, IntegerType
 
 # Add parent directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 from transform import create_spark_session
 
 

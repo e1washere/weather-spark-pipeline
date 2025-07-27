@@ -11,22 +11,23 @@ from typing import Optional
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
     col, when, isnan, isnull, mean, sum as spark_sum, 
-    to_date, year, month, dayofmonth, round as spark_round
+    to_date, year, month, dayofmonth, round as spark_round, lit
 )
 from pyspark.sql.types import (
     StructType, StructField, StringType, IntegerType, DateType
 )
+from config import config
 
 
 def setup_logging() -> None:
     """Configure logging for the transformation process."""
     logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=getattr(logging, config.LOG_LEVEL),
+        format=config.LOG_FORMAT
     )
 
 
-def create_spark_session(app_name: str = "WeatherETL") -> SparkSession:
+def create_spark_session(app_name: Optional[str] = None) -> SparkSession:
     """
     Create and configure SparkSession for weather data processing.
     
@@ -35,16 +36,23 @@ def create_spark_session(app_name: str = "WeatherETL") -> SparkSession:
         
     Returns:
         Configured SparkSession
+        
+    Raises:
+        Exception: If SparkSession creation fails
     """
     logger = logging.getLogger(__name__)
     
+    if app_name is None:
+        app_name = config.SPARK_APP_NAME
+    
     try:
-        spark = SparkSession.builder \
-            .appName(app_name) \
-            .config("spark.sql.adaptive.enabled", "true") \
-            .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
-            .getOrCreate()
+        builder = SparkSession.builder.appName(app_name)
         
+        # Apply all Spark configurations
+        for key, value in config.SPARK_CONFIGS.items():
+            builder = builder.config(key, value)
+        
+        spark = builder.getOrCreate()
         logger.info(f"Created SparkSession: {app_name}")
         return spark
         
@@ -63,34 +71,26 @@ def load_weather_data(spark: SparkSession, filepath: str) -> DataFrame:
         
     Returns:
         Spark DataFrame with weather data
+        
+    Raises:
+        Exception: If data loading fails
     """
     logger = logging.getLogger(__name__)
-    
-    # Define schema for better performance and type safety
-    schema = StructType([
-        StructField("DATE", StringType(), True),
-        StructField("STATION", StringType(), True),
-        StructField("TMAX", StringType(), True),
-        StructField("TMIN", StringType(), True),
-        StructField("PRCP", StringType(), True),
-        StructField("SNOW", StringType(), True),
-        StructField("SNWD", StringType(), True),
-        StructField("AWND", StringType(), True)
-    ])
     
     try:
         logger.info(f"Loading weather data from {filepath}")
         
         df = spark.read \
             .option("header", "true") \
-            .schema(schema) \
+            .schema(config.WEATHER_SCHEMA) \
             .csv(filepath)
         
-        logger.info(f"Loaded {df.count()} records from {filepath}")
+        record_count = df.count()
+        logger.info(f"Loaded {record_count} records from {filepath}")
         return df
         
     except Exception as e:
-        logger.error(f"Failed to load weather data: {e}")
+        logger.error(f"Failed to load weather data from {filepath}: {e}")
         raise
 
 
@@ -111,13 +111,11 @@ def clean_weather_data(df: DataFrame) -> DataFrame:
     # Convert date column to proper date type
     df_clean = df.withColumn("date", to_date(col("DATE"), "yyyy-MM-dd"))
     
-    # Convert numeric columns, treating empty strings as null
-    numeric_cols = ["TMAX", "TMIN", "PRCP", "SNOW", "SNWD", "AWND"]
-    
-    for col_name in numeric_cols:
+    # Convert numeric columns with proper null handling
+    for col_name in config.NUMERIC_COLUMNS:
         df_clean = df_clean.withColumn(
             col_name.lower(),
-            when(col(col_name) == "", None)
+            when(col(col_name) == "", lit(None).cast("double"))
             .otherwise(col(col_name).cast("double"))
         )
     
@@ -127,15 +125,18 @@ def clean_weather_data(df: DataFrame) -> DataFrame:
                       .withColumn("day", dayofmonth(col("date")))
     
     # Convert temperatures from tenths of degrees to degrees
-    df_clean = df_clean.withColumn("tmax_celsius", 
-                                  spark_round(col("tmax") / 10.0, 1)) \
-                      .withColumn("tmin_celsius", 
-                                  spark_round(col("tmin") / 10.0, 1))
+    df_clean = df_clean.withColumn(
+        "tmax_celsius", 
+        spark_round(col("tmax") / config.TEMPERATURE_DIVISOR, config.TEMPERATURE_PRECISION)
+    ).withColumn(
+        "tmin_celsius", 
+        spark_round(col("tmin") / config.TEMPERATURE_DIVISOR, config.TEMPERATURE_PRECISION)
+    )
     
     # Calculate daily average temperature
     df_clean = df_clean.withColumn(
         "tavg_celsius",
-        spark_round((col("tmax_celsius") + col("tmin_celsius")) / 2.0, 1)
+        spark_round((col("tmax_celsius") + col("tmin_celsius")) / 2.0, config.TEMPERATURE_PRECISION)
     )
     
     # Select final columns
@@ -184,10 +185,10 @@ def compute_daily_aggregations(df: DataFrame) -> DataFrame:
                   )
     
     # Round aggregated values
-    daily_agg = daily_agg.withColumn("avg_tmax", spark_round(col("avg_tmax"), 1)) \
-                        .withColumn("avg_tmin", spark_round(col("avg_tmin"), 1)) \
-                        .withColumn("avg_temperature", spark_round(col("avg_temperature"), 1)) \
-                        .withColumn("avg_wind_speed", spark_round(col("avg_wind_speed"), 1))
+    daily_agg = daily_agg.withColumn("avg_tmax", spark_round(col("avg_tmax"), config.TEMPERATURE_PRECISION)) \
+                        .withColumn("avg_tmin", spark_round(col("avg_tmin"), config.TEMPERATURE_PRECISION)) \
+                        .withColumn("avg_temperature", spark_round(col("avg_temperature"), config.TEMPERATURE_PRECISION)) \
+                        .withColumn("avg_wind_speed", spark_round(col("avg_wind_speed"), config.WIND_PRECISION))
     
     # Order by date
     daily_agg = daily_agg.orderBy("date")
@@ -196,7 +197,8 @@ def compute_daily_aggregations(df: DataFrame) -> DataFrame:
     return daily_agg
 
 
-def save_processed_data(df: DataFrame, output_path: str, partition_cols: Optional[list] = None) -> None:
+def save_processed_data(df: DataFrame, output_path: Optional[str] = None, 
+                       partition_cols: Optional[list] = None) -> None:
     """
     Save processed data as partitioned Parquet files.
     
@@ -204,11 +206,17 @@ def save_processed_data(df: DataFrame, output_path: str, partition_cols: Optiona
         df: DataFrame to save
         output_path: Path to save the Parquet files
         partition_cols: Columns to partition by
+        
+    Raises:
+        Exception: If data saving fails
     """
     logger = logging.getLogger(__name__)
     
+    if output_path is None:
+        output_path = config.get_output_path()
+    
     if partition_cols is None:
-        partition_cols = ["year", "month"]
+        partition_cols = config.PARTITION_COLUMNS
     
     logger.info(f"Saving processed data to {output_path}")
     logger.info(f"Partitioning by: {partition_cols}")
@@ -222,11 +230,12 @@ def save_processed_data(df: DataFrame, output_path: str, partition_cols: Optiona
         logger.info(f"Successfully saved processed data to {output_path}")
         
     except Exception as e:
-        logger.error(f"Failed to save processed data: {e}")
+        logger.error(f"Failed to save processed data to {output_path}: {e}")
         raise
 
 
-def create_temp_view(spark: SparkSession, df: DataFrame, view_name: str = "weather_data") -> None:
+def create_temp_view(spark: SparkSession, df: DataFrame, 
+                    view_name: Optional[str] = None) -> None:
     """
     Create a temporary SQL view for the processed data.
     
@@ -234,8 +243,14 @@ def create_temp_view(spark: SparkSession, df: DataFrame, view_name: str = "weath
         spark: SparkSession instance
         df: DataFrame to create view from
         view_name: Name for the temporary view
+        
+    Raises:
+        Exception: If view creation fails
     """
     logger = logging.getLogger(__name__)
+    
+    if view_name is None:
+        view_name = config.DEFAULT_VIEW_NAME
     
     try:
         df.createOrReplaceTempView(view_name)
@@ -253,48 +268,82 @@ def create_temp_view(spark: SparkSession, df: DataFrame, view_name: str = "weath
         spark.sql(sample_query).show()
         
     except Exception as e:
-        logger.error(f"Failed to create temporary view: {e}")
+        logger.error(f"Failed to create temporary view {view_name}: {e}")
         raise
 
 
-def generate_profile_report(df: DataFrame, output_path: str = "data/profile_report.md") -> None:
+def generate_profile_report(df: DataFrame, output_path: Optional[str] = None) -> None:
     """
-    Generate a simple data profile report (row count, nulls, min/max per column) and save as markdown.
+    Generate a simple data profile report and save as markdown.
+    
     Args:
         df: Spark DataFrame to profile
         output_path: Path to save the markdown report
+        
+    Raises:
+        Exception: If report generation fails
     """
     import pandas as pd
     logger = logging.getLogger(__name__)
+    
+    if output_path is None:
+        output_path = str(config.PROFILE_REPORT_PATH)
+    
     logger.info(f"Generating data profile report at {output_path}")
-    profile = []
-    row_count = df.count()
-    profile.append(f"# Data Profile Report\n\n")
-    profile.append(f"**Row count:** {row_count}\n\n")
-    profile.append("| Column | Nulls | Min | Max |\n|---|---|---|---|\n")
-    for col_name, dtype in df.dtypes:
-        nulls = df.filter(df[col_name].isNull()).count()
-        min_val = df.agg({col_name: 'min'}).collect()[0][0]
-        max_val = df.agg({col_name: 'max'}).collect()[0][0]
-        profile.append(f"| {col_name} | {nulls} | {min_val} | {max_val} |\n")
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w") as f:
-        f.writelines(profile)
-    logger.info(f"Profile report saved to {output_path}")
+    
+    try:
+        profile = []
+        row_count = df.count()
+        
+        profile.append("# Data Profile Report\n\n")
+        profile.append(f"**Row count:** {row_count}\n\n")
+        profile.append("| Column | Nulls | Min | Max |\n|---|---|---|---|\n")
+        
+        for col_name, dtype in df.dtypes:
+            nulls = df.filter(df[col_name].isNull()).count()
+            min_val = df.agg({col_name: 'min'}).collect()[0][0]
+            max_val = df.agg({col_name: 'max'}).collect()[0][0]
+            profile.append(f"| {col_name} | {nulls} | {min_val} | {max_val} |\n")
+        
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(output_path, "w") as f:
+            f.writelines(profile)
+        
+        logger.info(f"Profile report saved to {output_path}")
+        
+    except Exception as e:
+        logger.error(f"Failed to generate profile report: {e}")
+        raise
 
 
-def transform_weather_data(input_path: str, output_path: str) -> None:
+def transform_weather_data(input_path: Optional[str] = None, 
+                          output_path: Optional[str] = None) -> None:
     """
     Main transformation function that orchestrates the entire process.
     
     Args:
         input_path: Path to input CSV file
         output_path: Path to save processed Parquet files
+        
+    Raises:
+        Exception: If transformation process fails
     """
     logger = logging.getLogger(__name__)
     
+    if input_path is None:
+        input_path = config.get_input_path()
+    
+    if output_path is None:
+        output_path = config.get_output_path()
+    
     spark = None
     try:
+        logger.info("Starting weather data transformation")
+        
+        # Ensure directories exist
+        config.ensure_directories()
+        
         # Create Spark session
         spark = create_spark_session()
         
@@ -312,6 +361,7 @@ def transform_weather_data(input_path: str, output_path: str) -> None:
         
         # Create SQL view
         create_temp_view(spark, df_agg)
+        
         # Generate profile report
         generate_profile_report(df_agg)
         
@@ -322,17 +372,14 @@ def transform_weather_data(input_path: str, output_path: str) -> None:
         raise
     finally:
         if spark:
+            logger.info("Stopping SparkSession")
             spark.stop()
 
 
 def main() -> None:
     """Main function to run the transformation process."""
     setup_logging()
-    
-    input_path = "data/landing/weather_data_*.csv"
-    output_path = "data/processed/weather_parquet"
-    
-    transform_weather_data(input_path, output_path)
+    transform_weather_data()
 
 
 if __name__ == "__main__":

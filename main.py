@@ -14,6 +14,7 @@ from typing import Optional
 
 from ingest import download_noaa_data
 from transform import transform_weather_data
+from config import config
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -26,7 +27,7 @@ def setup_logging(log_level: str = "INFO") -> None:
     level = getattr(logging, log_level.upper())
     logging.basicConfig(
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format=config.LOG_FORMAT,
         handlers=[
             logging.StreamHandler(sys.stdout),
             logging.FileHandler('pipeline.log')
@@ -38,7 +39,7 @@ def run_ingestion(
     station_id: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    output_dir: str = "data/landing"
+    output_dir: Optional[str] = None
 ) -> str:
     """
     Run the data ingestion process.
@@ -51,8 +52,14 @@ def run_ingestion(
         
     Returns:
         Path to the downloaded CSV file
+        
+    Raises:
+        Exception: If ingestion process fails
     """
     logger = logging.getLogger(__name__)
+    
+    if output_dir is None:
+        output_dir = str(config.LANDING_DIR)
     
     logger.info("=" * 50)
     logger.info("STARTING DATA INGESTION")
@@ -75,8 +82,8 @@ def run_ingestion(
 
 
 def run_transformation(
-    input_path: str,
-    output_path: str = "data/processed/weather_parquet"
+    input_path: Optional[str] = None,
+    output_path: Optional[str] = None
 ) -> None:
     """
     Run the data transformation process.
@@ -84,6 +91,9 @@ def run_transformation(
     Args:
         input_path: Path to input CSV file
         output_path: Path to save processed Parquet files
+        
+    Raises:
+        Exception: If transformation process fails
     """
     logger = logging.getLogger(__name__)
     
@@ -104,8 +114,8 @@ def run_full_pipeline(
     station_id: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    landing_dir: str = "data/landing",
-    output_dir: str = "data/processed/weather_parquet"
+    landing_dir: Optional[str] = None,
+    output_dir: Optional[str] = None
 ) -> None:
     """
     Run the complete ETL pipeline.
@@ -116,14 +126,26 @@ def run_full_pipeline(
         end_date: End date in YYYY-MM-DD format
         landing_dir: Directory for raw data
         output_dir: Directory for processed data
+        
+    Raises:
+        Exception: If pipeline execution fails
     """
     logger = logging.getLogger(__name__)
+    
+    if landing_dir is None:
+        landing_dir = str(config.LANDING_DIR)
+    
+    if output_dir is None:
+        output_dir = config.get_output_path()
     
     logger.info("=" * 60)
     logger.info("STARTING WEATHER DATA ETL PIPELINE")
     logger.info("=" * 60)
     
     try:
+        # Ensure directories exist
+        config.ensure_directories()
+        
         # Step 1: Data Ingestion
         csv_filepath = run_ingestion(
             station_id=station_id,
@@ -145,7 +167,7 @@ def run_full_pipeline(
         
     except Exception as e:
         logger.error(f"ETL pipeline failed: {e}")
-        sys.exit(1)
+        raise
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -199,14 +221,12 @@ Examples:
     
     parser.add_argument(
         "--landing-dir",
-        default="data/landing",
-        help="Directory for raw data (default: data/landing)"
+        help="Directory for raw data (default: from config)"
     )
     
     parser.add_argument(
         "--output-dir",
-        default="data/processed/weather_parquet",
-        help="Directory for processed data (default: data/processed/weather_parquet)"
+        help="Directory for processed data (default: from config)"
     )
     
     parser.add_argument(
@@ -225,6 +245,9 @@ def validate_args(args: argparse.Namespace) -> None:
     
     Args:
         args: Parsed command-line arguments
+        
+    Raises:
+        ValueError: If arguments are invalid
     """
     if args.mode == "transform" and not args.input_path:
         raise ValueError("--input-path is required when using transform mode")
@@ -256,9 +279,8 @@ def main() -> None:
         setup_logging(args.log_level)
         logger = logging.getLogger(__name__)
         
-        # Create output directories
-        Path(args.landing_dir).mkdir(parents=True, exist_ok=True)
-        Path(args.output_dir).mkdir(parents=True, exist_ok=True)
+        # Ensure directories exist
+        config.ensure_directories()
         
         # Run the appropriate pipeline mode
         if args.mode == "ingest":
