@@ -2,20 +2,23 @@
 """
 Weather Data Transformation Module
 
-Processes weather data using PySpark for cleaning, aggregation, and analysis.
+Handles data cleaning, transformation, and aggregation using PySpark.
 """
 
 import logging
+import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime
+
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
-    col, when, isnan, isnull, mean, sum as spark_sum, 
+    col, when, isnan, isnull, mean, sum as spark_sum,
     to_date, year, month, dayofmonth, round as spark_round, lit
 )
-from pyspark.sql.types import (
-    StructType, StructField, StringType, IntegerType, DateType
-)
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DateType, DoubleType
+from py4j.protocol import Py4JJavaError
+
 from config import config
 
 
@@ -38,7 +41,8 @@ def create_spark_session(app_name: Optional[str] = None) -> SparkSession:
         Configured SparkSession
         
     Raises:
-        Exception: If SparkSession creation fails
+        Py4JJavaError: If SparkSession creation fails
+        ValueError: If app_name is invalid
     """
     logger = logging.getLogger(__name__)
     
@@ -56,9 +60,12 @@ def create_spark_session(app_name: Optional[str] = None) -> SparkSession:
         logger.info(f"Created SparkSession: {app_name}")
         return spark
         
-    except Exception as e:
-        logger.error(f"Failed to create SparkSession: {e}")
-        raise
+    except Py4JJavaError as e:
+        logger.error(f"Failed to create SparkSession '{app_name}': {e}")
+        raise Py4JJavaError(f"Spark initialization failed for '{app_name}': {e}")
+    except ValueError as e:
+        logger.error(f"Invalid Spark configuration: {e}")
+        raise ValueError(f"Invalid Spark configuration for '{app_name}': {e}")
 
 
 def load_weather_data(spark: SparkSession, filepath: str) -> DataFrame:
@@ -73,7 +80,8 @@ def load_weather_data(spark: SparkSession, filepath: str) -> DataFrame:
         Spark DataFrame with weather data
         
     Raises:
-        Exception: If data loading fails
+        FileNotFoundError: If the CSV file doesn't exist
+        Py4JJavaError: If Spark encounters an error or CSV format is invalid
     """
     logger = logging.getLogger(__name__)
     
@@ -89,9 +97,12 @@ def load_weather_data(spark: SparkSession, filepath: str) -> DataFrame:
         logger.info(f"Loaded {record_count} records from {filepath}")
         return df
         
-    except Exception as e:
-        logger.error(f"Failed to load weather data from {filepath}: {e}")
-        raise
+    except FileNotFoundError:
+        logger.error(f"Input file not found: {filepath}")
+        raise FileNotFoundError(f"Cannot load weather data: file {filepath} does not exist")
+    except Py4JJavaError as e:
+        logger.error(f"Spark error while loading {filepath}: {e}")
+        raise Py4JJavaError(f"Spark failed to process {filepath}: {e}")
 
 
 def clean_weather_data(df: DataFrame) -> DataFrame:
@@ -208,7 +219,9 @@ def save_processed_data(df: DataFrame, output_path: Optional[str] = None,
         partition_cols: Columns to partition by
         
     Raises:
-        Exception: If data saving fails
+        Py4JJavaError: If Spark save operation fails
+        ValueError: If partition columns are invalid
+        OSError: If output directory cannot be created
     """
     logger = logging.getLogger(__name__)
     
@@ -229,9 +242,15 @@ def save_processed_data(df: DataFrame, output_path: Optional[str] = None,
         
         logger.info(f"Successfully saved processed data to {output_path}")
         
-    except Exception as e:
-        logger.error(f"Failed to save processed data to {output_path}: {e}")
-        raise
+    except Py4JJavaError as e:
+        logger.error(f"Spark failed to save data to {output_path}: {e}")
+        raise Py4JJavaError(f"Data save operation failed for {output_path}: {e}")
+    except ValueError as e:
+        logger.error(f"Invalid partition configuration: {e}")
+        raise ValueError(f"Invalid partition columns {partition_cols}: {e}")
+    except OSError as e:
+        logger.error(f"Cannot create output directory {output_path}: {e}")
+        raise OSError(f"Failed to create output directory {output_path}: {e}")
 
 
 def create_temp_view(spark: SparkSession, df: DataFrame, 
@@ -245,7 +264,8 @@ def create_temp_view(spark: SparkSession, df: DataFrame,
         view_name: Name for the temporary view
         
     Raises:
-        Exception: If view creation fails
+        Py4JJavaError: If view creation fails
+        ValueError: If view_name is invalid
     """
     logger = logging.getLogger(__name__)
     
@@ -267,9 +287,12 @@ def create_temp_view(spark: SparkSession, df: DataFrame,
         
         spark.sql(sample_query).show()
         
-    except Exception as e:
-        logger.error(f"Failed to create temporary view {view_name}: {e}")
-        raise
+    except Py4JJavaError as e:
+        logger.error(f"Spark failed to create view '{view_name}': {e}")
+        raise Py4JJavaError(f"SQL view creation failed for '{view_name}': {e}")
+    except ValueError as e:
+        logger.error(f"Invalid view name '{view_name}': {e}")
+        raise ValueError(f"Invalid SQL view name '{view_name}': {e}")
 
 
 def generate_profile_report(df: DataFrame, output_path: Optional[str] = None) -> None:
@@ -281,7 +304,9 @@ def generate_profile_report(df: DataFrame, output_path: Optional[str] = None) ->
         output_path: Path to save the markdown report
         
     Raises:
-        Exception: If report generation fails
+        Py4JJavaError: If Spark operations fail
+        OSError: If report file cannot be written
+        ValueError: If DataFrame is empty
     """
     import pandas as pd
     logger = logging.getLogger(__name__)
@@ -294,6 +319,9 @@ def generate_profile_report(df: DataFrame, output_path: Optional[str] = None) ->
     try:
         profile = []
         row_count = df.count()
+        
+        if row_count == 0:
+            raise ValueError("Cannot generate profile for empty DataFrame")
         
         profile.append("# Data Profile Report\n\n")
         profile.append(f"**Row count:** {row_count}\n\n")
@@ -312,9 +340,15 @@ def generate_profile_report(df: DataFrame, output_path: Optional[str] = None) ->
         
         logger.info(f"Profile report saved to {output_path}")
         
-    except Exception as e:
-        logger.error(f"Failed to generate profile report: {e}")
-        raise
+    except Py4JJavaError as e:
+        logger.error(f"Spark failed to generate profile: {e}")
+        raise Py4JJavaError(f"Data profiling failed: {e}")
+    except OSError as e:
+        logger.error(f"Cannot write profile report to {output_path}: {e}")
+        raise OSError(f"Failed to write profile report to {output_path}: {e}")
+    except ValueError as e:
+        logger.error(f"Invalid data for profiling: {e}")
+        raise ValueError(f"Data profiling error: {e}")
 
 
 def transform_weather_data(input_path: Optional[str] = None, 
@@ -327,7 +361,10 @@ def transform_weather_data(input_path: Optional[str] = None,
         output_path: Path to save processed Parquet files
         
     Raises:
-        Exception: If transformation process fails
+        FileNotFoundError: If input file doesn't exist
+        Py4JJavaError: If Spark operations fail
+        OSError: If output directory cannot be created
+        ValueError: If input data is invalid
     """
     logger = logging.getLogger(__name__)
     
@@ -367,7 +404,7 @@ def transform_weather_data(input_path: Optional[str] = None,
         
         logger.info("Weather data transformation completed successfully")
         
-    except Exception as e:
+    except (FileNotFoundError, Py4JJavaError, OSError, ValueError) as e:
         logger.error(f"Weather data transformation failed: {e}")
         raise
     finally:

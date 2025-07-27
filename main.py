@@ -11,6 +11,8 @@ import logging
 import sys
 from pathlib import Path
 from typing import Optional
+import requests
+from py4j.protocol import Py4JJavaError
 
 from ingest import download_noaa_data
 from transform import transform_weather_data
@@ -54,7 +56,9 @@ def run_ingestion(
         Path to the downloaded CSV file
         
     Raises:
-        Exception: If ingestion process fails
+        ValueError: If date format is invalid or station_id is invalid
+        OSError: If output directory cannot be created
+        requests.RequestException: If download fails
     """
     logger = logging.getLogger(__name__)
     
@@ -76,9 +80,15 @@ def run_ingestion(
         logger.info(f"Data ingestion completed: {filepath}")
         return filepath
         
-    except Exception as e:
-        logger.error(f"Data ingestion failed: {e}")
-        raise
+    except ValueError as e:
+        logger.error(f"Data ingestion failed - invalid parameters: {e}")
+        raise ValueError(f"Ingestion failed due to invalid parameters: {e}")
+    except OSError as e:
+        logger.error(f"Data ingestion failed - file system error: {e}")
+        raise OSError(f"Ingestion failed due to file system error: {e}")
+    except requests.RequestException as e:
+        logger.error(f"Data ingestion failed - network error: {e}")
+        raise requests.RequestException(f"Ingestion failed due to network error: {e}")
 
 
 def run_transformation(
@@ -93,7 +103,10 @@ def run_transformation(
         output_path: Path to save processed Parquet files
         
     Raises:
-        Exception: If transformation process fails
+        FileNotFoundError: If input file doesn't exist
+        Py4JJavaError: If Spark operations fail
+        OSError: If output directory cannot be created
+        ValueError: If input data is invalid
     """
     logger = logging.getLogger(__name__)
     
@@ -105,9 +118,18 @@ def run_transformation(
         transform_weather_data(input_path, output_path)
         logger.info("Data transformation completed successfully")
         
-    except Exception as e:
-        logger.error(f"Data transformation failed: {e}")
-        raise
+    except FileNotFoundError as e:
+        logger.error(f"Data transformation failed - file not found: {e}")
+        raise FileNotFoundError(f"Transformation failed - input file not found: {e}")
+    except Py4JJavaError as e:
+        logger.error(f"Data transformation failed - Spark error: {e}")
+        raise Py4JJavaError(f"Transformation failed - Spark error: {e}")
+    except OSError as e:
+        logger.error(f"Data transformation failed - file system error: {e}")
+        raise OSError(f"Transformation failed - file system error: {e}")
+    except ValueError as e:
+        logger.error(f"Data transformation failed - invalid data: {e}")
+        raise ValueError(f"Transformation failed - invalid data: {e}")
 
 
 def run_full_pipeline(
@@ -128,7 +150,11 @@ def run_full_pipeline(
         output_dir: Directory for processed data
         
     Raises:
-        Exception: If pipeline execution fails
+        FileNotFoundError: If input file doesn't exist
+        Py4JJavaError: If Spark operations fail
+        OSError: If directories cannot be created
+        ValueError: If parameters or data are invalid
+        requests.RequestException: If download fails
     """
     logger = logging.getLogger(__name__)
     
@@ -165,7 +191,7 @@ def run_full_pipeline(
         logger.info("=" * 60)
         logger.info(f"Processed data saved to: {output_dir}")
         
-    except Exception as e:
+    except (FileNotFoundError, Py4JJavaError, OSError, ValueError, requests.RequestException) as e:
         logger.error(f"ETL pipeline failed: {e}")
         raise
 
@@ -304,7 +330,7 @@ def main() -> None:
                 output_dir=args.output_dir
             )
             
-    except Exception as e:
+    except (ValueError, FileNotFoundError, OSError, requests.RequestException) as e:
         logger = logging.getLogger(__name__)
         logger.error(f"Pipeline execution failed: {e}")
         sys.exit(1)

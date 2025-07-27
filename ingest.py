@@ -41,9 +41,9 @@ def download_noaa_data(
         Path to the downloaded CSV file
         
     Raises:
-        requests.RequestException: If download fails
-        IOError: If file cannot be written
-        ValueError: If date format is invalid
+        ValueError: If date format is invalid or dates are invalid
+        OSError: If directory cannot be created or file cannot be written
+        requests.RequestException: If download fails (for future API integration)
     """
     logger = logging.getLogger(__name__)
     
@@ -66,7 +66,11 @@ def download_noaa_data(
     
     # Create output directory
     output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
+    try:
+        output_path.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        logger.error(f"Cannot create output directory {output_dir}: {e}")
+        raise OSError(f"Failed to create output directory {output_dir}: {e}")
     
     # For demo purposes, we'll use a sample weather CSV format
     # In production, you'd use NOAA's actual API with authentication
@@ -85,9 +89,9 @@ def download_noaa_data(
         logger.info(f"Successfully saved weather data to {filepath}")
         return str(filepath)
         
-    except IOError as e:
-        logger.error(f"Failed to write data to {filepath}: {e}")
-        raise
+    except OSError as e:
+        logger.error(f"Cannot write data to {filepath}: {e}")
+        raise OSError(f"Failed to write weather data to {filepath}: {e}")
 
 
 def generate_sample_weather_data(start_date: str, end_date: str) -> str:
@@ -102,7 +106,7 @@ def generate_sample_weather_data(start_date: str, end_date: str) -> str:
         CSV string with sample weather data
         
     Raises:
-        ValueError: If date format is invalid
+        ValueError: If date format is invalid or date range is invalid
     """
     import random
     from datetime import datetime, timedelta
@@ -112,6 +116,9 @@ def generate_sample_weather_data(start_date: str, end_date: str) -> str:
         end_dt = datetime.strptime(end_date, '%Y-%m-%d')
     except ValueError as e:
         raise ValueError(f"Invalid date format: {e}")
+    
+    if current_date > end_dt:
+        raise ValueError("Start date must be before end date")
     
     csv_lines = [
         "DATE,STATION,TMAX,TMIN,PRCP,SNOW,SNWD,AWND"
